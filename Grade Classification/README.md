@@ -1,5 +1,5 @@
 # Mango Grade Classification using Self-Distillation Framework
-The Mango Grade Classification is a competition from AICUP 2020 in Taiwan. The task is to classify a given mango image into 3 grade that represent its quality.
+This task is to classify a given mango image into 3 grade that represent its quality.
 
 We apply the self distillation framework[1] to this dataset and additionally use 2 kind of losses to boost the performance - triplet loss and ordinal loss.
 
