@@ -86,7 +86,7 @@ class ShallowNet(nn.Module):
         self.bottleneck = nn.Sequential(*layers)
         self.avgpool = nn.AvgPool2d(4, 4)
         self.fc = nn.Linear(512 * expansion, num_classes)
-    
+            
     def forward(self, x, get_outputs=True):
         x = self.bottleneck(x)
         x = self.avgpool(x)
@@ -105,5 +105,6 @@ class ShallowAttentionNet(ShallowNet):
         self.attention = AttentionModule(channels[0] * expansion, channels[0] * expansion)
     
     def forward(self, x, get_outputs=True):
-        x = self.attention(x)
+        attention = self.attention(x)
+        x = attention * x
         return super().forward(x, get_outputs)

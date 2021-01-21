@@ -6,14 +6,11 @@ def get_criterion(args, criterion_type='CE'):
     criterion = None
     # CrossEntropy Loss
     if criterion_type == 'CE':
-        weights = None
         if args.ce_weight is not None:
             weights = torch.tensor(args.ce_weight).cuda()
-        
-        criterion = nn.CrossEntropyLoss(weight=weights)
-    # Focal Loss
-    elif criterion_type == 'focal':
-        criterion = FocalLoss(gamma=args.focal_gamma, alpha=args.focal_alpha)
+            criterion = nn.CrossEntropyLoss(weight=weights)
+        else:
+            criterion = nn.CrossEntropyLoss()
     # KL div loss
     elif criterion_type == 'KL':
         criterion = KL_div(temperature=args.temperature, size_average=None, reduce=None, reduction='batchmean')
@@ -22,30 +19,6 @@ def get_criterion(args, criterion_type='CE'):
         criterion = TripletLikeLoss(triplet_margin=args.tri_margin, ordinal_margin=args.ord_margin)
     
     return criterion
-
-class CE_weighted(nn.Module):
-    def __init__(self, weighted_mat=None):
-        super(CE_weighted, self).__init__()
-        self.CE = nn.CrossEntropyLoss(reduction='none')
-        self.w_mat = weighted_mat
-    
-    def forward(self, outputs, targets):
-        # CE loss of the batch
-        loss = self.CE(outputs, targets)
-        
-        # find the indexes of predicted labels
-        _, idx = torch.max(outputs, dim=1)
-        
-        # stack the true and predicted labels
-        indices = torch.stack((targets, idx), dim=0)
-        indices = indices.tolist()
-        
-        # get the corresponding weights
-        mask = self.w_mat[indices].cuda()
-
-        # final loss
-        loss = (loss * mask).mean()
-        return loss
 
 class KL_div(nn.Module):
     def __init__(self, temperature=1, size_average=None, reduce=None, reduction='mean'):
@@ -61,41 +34,6 @@ class KL_div(nn.Module):
         # loss = -(log_softmax_outputs * softmax_targets).sum(dim=1).mean()
         loss = F.kl_div(log_softmax_outputs, softmax_targets, size_average=self.size_average, reduce=self.reduce, reduction=self.reduction) * (self.temp ** 2)
         return loss
-
-class FocalLoss(nn.Module):
-    def __init__(self, gamma=0, alpha=None, size_average=True):
-        super(FocalLoss, self).__init__()
-        self.gamma = gamma
-        self.alpha = alpha
-        if isinstance(alpha, (float, int)): self.alpha = torch.Tensor([alpha, 1 - alpha])
-        if isinstance(alpha, list): self.alpha = torch.Tensor(alpha)
-        self.size_average = size_average
-
-    def forward(self, input, target):
-        # C is class num, N is batch size, H and W are the size of feature map
-        if input.dim()>2:
-            input = input.view(input.size(0), input.size(1), -1)  # N,C,H,W => N,C,H*W
-            input = input.transpose(1, 2)                         # N,C,H*W => N,H*W,C
-            input = input.contiguous().view(-1, input.size(2))    # N,H*W,C => N*H*W,C
-        
-        target = target.view(-1, 1)
-        
-        logpt = F.log_softmax(input, dim=1)
-        logpt = logpt.gather(1, target)
-        logpt = logpt.view(-1)
-        pt = logpt.exp()
-
-        if self.alpha is not None:
-            if self.alpha.type() != input.data.type():
-                self.alpha = self.alpha.type_as(input.data)
-            at = self.alpha.gather(0, target.data.view(-1))
-            logpt = logpt * at
-
-        loss = -1 * (1 - pt) ** self.gamma * logpt
-        if self.size_average:
-            return loss.mean()
-        else:
-            return loss.sum()
 
 # online triplet loss from https://github.com/NegatioN/OnlineMiningTripletLoss/blob/master/online_triplet_loss/losses.py
 # include triplet loss and ordinal loss
