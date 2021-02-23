@@ -1,0 +1,4 @@
+classes=5
+train=./train.txt
+valid=./val.txt
+names=mango.names
